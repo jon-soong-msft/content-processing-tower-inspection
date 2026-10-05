@@ -1,0 +1,840 @@
+{
+  "$defs": {
+    "CameraViewpoint": {
+      "description": "Camera perspective relative to the transmission tower.\n\nAttributes:\n    spatial_reasoning: Chain-of-thought scratchpad for establishing the viewpoint.\n    view_angle: Computed camera position label.\n    distance_band: Qualitative stand-off distance from the structure.\n    description: Free-text summary of the camera position.",
+      "properties": {
+        "spatial_reasoning": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "MANDATORY chain-of-thought reasoning about the camera position, answered IN ORDER: (1) Is the full structure visible from base to peak, or only a partial section? (2) Is the camera below the structure looking up (ground patrol), level with the cross-arms (aerial/drone), or above looking down? (3) Which face of the tower is presented to the camera relative to the conductor run? (4) How much of the frame does the structure occupy, and does that imply close, mid or far stand-off? (5) Therefore view_angle and distance_band = ?",
+          "title": "Spatial Reasoning"
+        },
+        "view_angle": {
+          "anyOf": [
+            {
+              "enum": [
+                "ground-level-upward",
+                "ground-level-oblique",
+                "mid-height-lateral",
+                "aerial-oblique",
+                "aerial-overhead",
+                "cross-arm-close-up",
+                "foundation-close-up",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Primary camera viewing angle relative to the tower. Use 'cross-arm-close-up' or 'foundation-close-up' only when a single component fills most of the frame. Use 'unknown' when the perspective cannot be established.",
+          "title": "View Angle"
+        },
+        "distance_band": {
+          "anyOf": [
+            {
+              "enum": [
+                "close",
+                "mid",
+                "far",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Qualitative stand-off distance. 'close' = individual bolts/fittings are resolvable; 'mid' = members and insulator strings are resolvable but not fasteners; 'far' = only the overall silhouette is resolvable.",
+          "title": "Distance Band"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Free-text description of the camera position, e.g. 'Ground-level upward view from the south leg showing the lower body, both lower cross-arms and the left-hand insulator string.'",
+          "title": "Description"
+        }
+      },
+      "required": [
+        "spatial_reasoning",
+        "view_angle",
+        "distance_band",
+        "description"
+      ],
+      "title": "CameraViewpoint",
+      "type": "object"
+    },
+    "AssetIdentification": {
+      "description": "Identity of the inspected structure, used as the correlation join key.\n\nAttributes:\n    identification_reasoning: Chain-of-thought scratchpad for the tower identity.\n    tower_id: Structure identifier read from the media.\n    tower_id_source: Where in the media the identifier was read from.\n    nameplate_text: Verbatim transcription of any nameplate or stencilled marking.\n    structure_type: Physical construction type of the structure.\n    circuit_designation: Line or circuit name if legible.",
+      "properties": {
+        "identification_reasoning": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "MANDATORY chain-of-thought reasoning about asset identity, answered IN ORDER: (1) Is there a nameplate, stencilled number, painted marking or tag anywhere in the frame? (2) Is every character legible, or are some inferred? (3) Does the number pattern look like a structure ID versus a circuit or danger-sign code? (4) If nothing is legible, state that explicitly rather than guessing. NEVER invent or complete a tower ID that is not fully readable.",
+          "title": "Identification Reasoning"
+        },
+        "tower_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Structure identifier exactly as read from the media. MUST be null when no identifier is legible — an inferred or partially guessed ID breaks the tower-ID join key and is worse than no ID at all.",
+          "title": "Tower Id"
+        },
+        "tower_id_source": {
+          "anyOf": [
+            {
+              "enum": [
+                "nameplate",
+                "stencilled-marking",
+                "attached-tag",
+                "painted-number",
+                "not-visible"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Where the identifier was read from. Use 'not-visible' whenever tower_id is null.",
+          "title": "Tower Id Source"
+        },
+        "nameplate_text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Verbatim transcription of all legible text on nameplates, danger signs or stencilled markings, including line names and voltage ratings. Transcribe only what is readable; do not normalise or expand abbreviations.",
+          "title": "Nameplate Text"
+        },
+        "structure_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "lattice-tower",
+                "monopole",
+                "guyed-mast",
+                "h-frame",
+                "concrete-pole",
+                "wood-pole",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Physical construction type of the structure as observed in the media.",
+          "title": "Structure Type"
+        },
+        "circuit_designation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Transmission line or circuit designation if legible in the media, e.g. 'Luzon 230kV L-14'. Null when not legible.",
+          "title": "Circuit Designation"
+        }
+      },
+      "required": [
+        "identification_reasoning",
+        "tower_id",
+        "tower_id_source",
+        "nameplate_text",
+        "structure_type",
+        "circuit_designation"
+      ],
+      "title": "AssetIdentification",
+      "type": "object"
+    },
+    "MediaQuality": {
+      "description": "Usability gate applied before any anomaly is scored.\n\nMedia judged unusable must be filtered out rather than scored, so that a\ndark or obstructed frame never produces a low-confidence finding that\nlooks like a real detection.\n\nAttributes:\n    quality_reasoning: Chain-of-thought scratchpad for the usability decision.\n    is_usable: Whether the media meets the minimum bar for scoring.\n    unusable_reasons: Specific defects that make the media unusable.\n    lighting: Lighting condition observed.\n    obstruction: Degree to which the structure is occluded.\n    framing: Whether the structure is adequately framed.",
+      "properties": {
+        "quality_reasoning": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "MANDATORY chain-of-thought reasoning about media usability, answered IN ORDER: (1) Can steel members be distinguished from the background? (2) Is any part of the structure occluded by vegetation, cloud, glare, rain or lens contamination? (3) Is the structure adequately framed, or is it cropped/off-centre such that whole sections are missing? (4) Is there motion blur or focus blur at the scale needed to judge surface condition? (5) Therefore is this media usable for defect scoring, yes or no?",
+          "title": "Quality Reasoning"
+        },
+        "is_usable": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "True when the media supports defect scoring. When false, the anomalies array MUST be empty — report the quality problem instead of speculating about defects.",
+          "title": "Is Usable"
+        },
+        "unusable_reasons": {
+          "anyOf": [
+            {
+              "items": {
+                "enum": [
+                  "low-light",
+                  "overexposed",
+                  "motion-blur",
+                  "out-of-focus",
+                  "obstructed-view",
+                  "wrong-framing",
+                  "excessive-distance",
+                  "weather-obscured",
+                  "lens-contamination"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Specific reasons the media is unusable. MUST be empty when is_usable is true.",
+          "title": "Unusable Reasons"
+        },
+        "lighting": {
+          "anyOf": [
+            {
+              "enum": [
+                "good",
+                "acceptable",
+                "poor"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Lighting condition as observed in the media.",
+          "title": "Lighting"
+        },
+        "obstruction": {
+          "anyOf": [
+            {
+              "enum": [
+                "none",
+                "partial",
+                "severe"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Degree to which the structure is occluded by vegetation, weather or foreground objects.",
+          "title": "Obstruction"
+        },
+        "framing": {
+          "anyOf": [
+            {
+              "enum": [
+                "full-structure",
+                "partial-structure",
+                "component-only",
+                "structure-not-centred"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How much of the structure the frame captures. 'component-only' is valid framing for close-up inspection media and is not by itself an unusable condition.",
+          "title": "Framing"
+        }
+      },
+      "required": [
+        "quality_reasoning",
+        "is_usable",
+        "unusable_reasons",
+        "lighting",
+        "obstruction",
+        "framing"
+      ],
+      "title": "MediaQuality",
+      "type": "object"
+    },
+    "AnomalyBoundingBox": {
+      "description": "Bounding box locating an anomaly in normalized image coordinates [0..1].",
+      "properties": {
+        "x_min": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Left edge of the box as a fraction of image width, 0.0 at the left edge and 1.0 at the right edge.",
+          "title": "X Min"
+        },
+        "y_min": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Top edge of the box as a fraction of image height, 0.0 at the top edge and 1.0 at the bottom edge.",
+          "title": "Y Min"
+        },
+        "x_max": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Right edge of the box as a fraction of image width. MUST be greater than x_min.",
+          "title": "X Max"
+        },
+        "y_max": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Bottom edge of the box as a fraction of image height. MUST be greater than y_min.",
+          "title": "Y Max"
+        }
+      },
+      "required": [
+        "x_min",
+        "y_min",
+        "x_max",
+        "y_max"
+      ],
+      "title": "AnomalyBoundingBox",
+      "type": "object"
+    },
+    "AnomalyDetection": {
+      "description": "A single scored anomaly detected on the structure.\n\nExactly six anomaly classes are recognised. Anything that does not fall\ninto one of the six is not a detection and must be omitted rather than\nforced into the nearest class.\n\nAttributes:\n    detection_id: Stable within-media identifier for this detection.\n    class_reasoning: Chain-of-thought scratchpad for the class decision.\n    anomaly_class: One of the six recognised classes.\n    component: Structural component the anomaly sits on.\n    description: Factual description of what is visible.\n    severity_reasoning: Chain-of-thought scratchpad for the severity decision.\n    severity: Three-level severity score.\n    severity_criteria: The specific criterion that set the severity level.\n    confidence: Model confidence in this detection.\n    bounding_box: Normalized location of the anomaly in the media.\n    progression_indicator: Visual evidence of how advanced the condition is.\n    recommended_action: Operational follow-up implied by class and severity.",
+      "properties": {
+        "detection_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Short stable identifier for this detection within this media item, e.g. 'D1', 'D2'. Used to tie a finding back to its bounding box in the evidence chain.",
+          "title": "Detection Id"
+        },
+        "class_reasoning": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "MANDATORY chain-of-thought reasoning about classification, answered IN ORDER: (1) What exactly is visible at this location — describe texture, colour, shape and contrast against the surrounding steel? (2) Could this be a benign look-alike: shadow, water staining, galvanising mottle, factory paint, a lens artefact, or a legitimate fitting seen at an odd angle? (3) Which of the six classes does the evidence support, and what rules out the other five? (4) If no class is supported, say so — this detection must then be omitted from the output entirely.",
+          "title": "Class Reasoning"
+        },
+        "anomaly_class": {
+          "anyOf": [
+            {
+              "enum": [
+                "corrosion",
+                "vegetation-encroachment",
+                "structural-tilt",
+                "missing-hardware",
+                "bird-nesting",
+                "foreign-object"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The anomaly class. Definitions: 'corrosion' = metal loss, rust bloom, scaling or section loss on members, cross-arms or fittings. 'vegetation-encroachment' = growth advancing into the right of way or toward conductors. 'structural-tilt' = lean, twist, buckling or deformation of the structure relative to vertical. 'missing-hardware' = absent bolts, nuts, plates, step bolts, dampers or fittings versus the expected symmetric configuration. 'bird-nesting' = nests or nesting material on a live structure. 'foreign-object' = storm debris, wind-blown material, kites, netting or sheeting lodged on the structure. These six are exhaustive; do not invent a seventh class.",
+          "title": "Anomaly Class"
+        },
+        "component": {
+          "anyOf": [
+            {
+              "enum": [
+                "cross-arm",
+                "tower-leg",
+                "bracing-member",
+                "peak-earth-wire-support",
+                "insulator-string",
+                "conductor",
+                "fitting-or-hardware",
+                "foundation-or-base",
+                "right-of-way",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Structural component the anomaly sits on or, for vegetation, 'right-of-way'.",
+          "title": "Component"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Factual description of what is visible at this location, e.g. 'Rust bloom with surface scaling along the upper flange of the lower left cross-arm, extending roughly one third of its length.' Describe only observable evidence — no repair advice, no cost, no time estimate.",
+          "title": "Description"
+        },
+        "severity_reasoning": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "MANDATORY chain-of-thought reasoning about severity, answered IN ORDER: (1) How much of the component is affected — a localised patch, a significant fraction, or the whole member? (2) Is the affected component load-bearing or ancillary? (3) Is there visible evidence of progression such as section loss, through-holes, deformation or staining runoff? (4) Does the condition threaten electrical clearance or mechanical integrity now, or only if left unattended? (5) Therefore severity = low, medium or high?",
+          "title": "Severity Reasoning"
+        },
+        "severity": {
+          "anyOf": [
+            {
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Three-level severity, scored consistently across all six classes. 'low' = cosmetic or early-stage, no effect on integrity or clearance, monitor on the normal cycle. 'medium' = established condition on a load-bearing or clearance-critical element that will worsen without intervention, schedule work. 'high' = integrity or clearance is compromised now, or the condition is advanced enough to warrant enhanced monitoring or immediate attention.",
+          "title": "Severity"
+        },
+        "severity_criteria": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The single decisive criterion that set the severity level, stated in one sentence, e.g. 'Affects a primary load-bearing leg member with visible section loss.' This is what an inspector audits the score against.",
+          "title": "Severity Criteria"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Confidence in this detection from 0.0 to 1.0. Report honestly: a distant or partially occluded observation must carry low confidence even when the class is probable.",
+          "title": "Confidence"
+        },
+        "bounding_box": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AnomalyBoundingBox"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Normalized bounding box locating the anomaly in the media. Null only when the anomaly is a whole-structure property such as tilt that cannot be localised to a region.",
+          "title": "Bounding Box"
+        },
+        "progression_indicator": {
+          "anyOf": [
+            {
+              "enum": [
+                "early-stage",
+                "established",
+                "advanced",
+                "not-assessable"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How far the condition has developed, judged from this media alone. Supports progression tracking across visits when the same structure is re-inspected. Use 'not-assessable' when the media does not resolve enough detail.",
+          "title": "Progression Indicator"
+        },
+        "recommended_action": {
+          "anyOf": [
+            {
+              "enum": [
+                "monitor-next-cycle",
+                "schedule-inspection",
+                "dispatch-clearing-crew",
+                "enhanced-monitoring",
+                "immediate-intervention"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Operational follow-up implied by class and severity. Use 'dispatch-clearing-crew' for vegetation encroachment and 'enhanced-monitoring' for high-severity structural tilt. This is an operational routing hint only — NEVER include cost, budget, repair estimates or contractor pricing anywhere in this assessment.",
+          "title": "Recommended Action"
+        }
+      },
+      "required": [
+        "detection_id",
+        "class_reasoning",
+        "anomaly_class",
+        "component",
+        "description",
+        "severity_reasoning",
+        "severity",
+        "severity_criteria",
+        "confidence",
+        "bounding_box",
+        "progression_indicator",
+        "recommended_action"
+      ],
+      "title": "AnomalyDetection",
+      "type": "object"
+    },
+    "OverallAssessment": {
+      "description": "Roll-up of the individual detections for triage and ranking.\n\nAttributes:\n    anomaly_count: Number of detections reported.\n    highest_severity: Highest severity across all detections.\n    classes_present: Distinct anomaly classes observed.\n    structural_risk_summary: One-paragraph condition summary.\n    requires_work_order: Whether the findings warrant raising a work order.\n    inspection_outcome: Overall disposition of this media item.",
+      "properties": {
+        "anomaly_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Number of detections reported in the anomalies array. MUST equal the array length, and MUST be 0 when the media is unusable.",
+          "title": "Anomaly Count"
+        },
+        "highest_severity": {
+          "anyOf": [
+            {
+              "enum": [
+                "none",
+                "low",
+                "medium",
+                "high"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Highest severity across all detections, or 'none' when no anomaly was detected or the media was filtered as unusable.",
+          "title": "Highest Severity"
+        },
+        "classes_present": {
+          "anyOf": [
+            {
+              "items": {
+                "enum": [
+                  "corrosion",
+                  "vegetation-encroachment",
+                  "structural-tilt",
+                  "missing-hardware",
+                  "bird-nesting",
+                  "foreign-object"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Distinct anomaly classes observed in this media item, without duplicates.",
+          "title": "Classes Present"
+        },
+        "structural_risk_summary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "One short paragraph summarising the condition of the structure as evidenced by this media, referencing the detections by their detection_id. State only what the media supports.",
+          "title": "Structural Risk Summary"
+        },
+        "requires_work_order": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "True when at least one medium or high severity detection warrants raising a work order. A work order raised from this assessment is a recommendation for human approval, never an autonomous action.",
+          "title": "Requires Work Order"
+        },
+        "inspection_outcome": {
+          "anyOf": [
+            {
+              "enum": [
+                "clear",
+                "anomalies-detected",
+                "filtered-unusable-media"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Disposition of this media item. 'clear' = usable media with no anomaly found. 'anomalies-detected' = one or more scored detections. 'filtered-unusable-media' = media failed the usability gate and was not scored.",
+          "title": "Inspection Outcome"
+        }
+      },
+      "required": [
+        "anomaly_count",
+        "highest_severity",
+        "classes_present",
+        "structural_risk_summary",
+        "requires_work_order",
+        "inspection_outcome"
+      ],
+      "title": "OverallAssessment",
+      "type": "object"
+    },
+    "EvidenceChain": {
+      "description": "Attribution payload so every finding can be traced back to its source.\n\nAn assessment that cannot be traced to a source media item and a point\nin time is a defect, not a degraded mode.\n\nAttributes:\n    source_media_reference: Filename or identifier of the analysed media.\n    media_kind: Whether the evidence is a still image or a video frame.\n    capture_timestamp: Capture time read from the media, if present.\n    frame_reference: Frame or timestamp offset within a clip.\n    visible_text_evidence: Any on-media text supporting the attribution.",
+      "properties": {
+        "source_media_reference": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Filename or identifier of the media item this assessment was derived from, as supplied with the media.",
+          "title": "Source Media Reference"
+        },
+        "media_kind": {
+          "anyOf": [
+            {
+              "enum": [
+                "still-image",
+                "video-frame"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Whether the analysed evidence is a still photograph or a frame extracted from a clip.",
+          "title": "Media Kind"
+        },
+        "capture_timestamp": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Capture timestamp burned into the media or shown on an overlay, transcribed verbatim. Null when no timestamp is visible — do NOT substitute the processing time, because this field is half of the tower-ID plus timestamp join key.",
+          "title": "Capture Timestamp"
+        },
+        "frame_reference": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Offset or frame identifier within a clip, e.g. '00:00:00.500'. Null for a still image.",
+          "title": "Frame Reference"
+        },
+        "visible_text_evidence": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Any other on-media text that supports attribution, such as camera identifiers, GPS overlays or patrol tags, transcribed verbatim.",
+          "title": "Visible Text Evidence"
+        }
+      },
+      "required": [
+        "source_media_reference",
+        "media_kind",
+        "capture_timestamp",
+        "frame_reference",
+        "visible_text_evidence"
+      ],
+      "title": "EvidenceChain",
+      "type": "object"
+    }
+  },
+  "description": "Structured inspection assessment of a transmission tower from a still image or a short clip frame.\n\nThe assessment recognises six anomaly classes — corrosion, vegetation\nencroachment, structural tilt, missing hardware, bird nesting and foreign\nobject — and scores each detection on a consistent three-level severity\nscale.\n\nThree rules govern the output:\n\n1. Evidence first. Every finding must be traceable to a source media\n   reference and, where visible, a capture timestamp. Unattributed\n   inference is a defect.\n2. Filter, do not guess. Media that is too dark, too distant, obstructed\n   or badly framed is reported as unusable and is NOT scored.\n3. No commercial content. Cost, budget, repair estimates and contractor\n   pricing are out of scope and must never appear in any field.\n\nAttributes:\n    asset_identification: Identity of the inspected structure.\n    capture_context: Camera perspective and stand-off distance.\n    media_quality: Usability gate applied before scoring.\n    anomalies: Scored anomaly detections.\n    overall_assessment: Roll-up for triage and ranking.\n    evidence: Attribution payload for traceability.",
+  "properties": {
+    "asset_identification": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AssetIdentification"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Identity of the inspected structure. The tower identifier is the join key used to correlate this assessment with telemetry, maintenance history and weather, so it must never be guessed.",
+      "title": "Asset Identification"
+    },
+    "capture_context": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CameraViewpoint"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Camera perspective and stand-off distance, which bound what can legitimately be concluded from the media.",
+      "title": "Capture Context"
+    },
+    "media_quality": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/MediaQuality"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Usability gate. Assess this BEFORE looking for anomalies: if the media is unusable, report it and return an empty anomalies array.",
+      "title": "Media Quality"
+    },
+    "anomalies": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/AnomalyDetection"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "All anomalies detected in the media, one entry per distinct finding. Report an empty array when the structure is clear or when the media failed the usability gate. Do not merge two separate findings into one entry, and do not split one continuous defect across multiple entries.",
+      "title": "Anomalies"
+    },
+    "overall_assessment": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/OverallAssessment"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Roll-up of the detections, used to rank structures for maintenance planning.",
+      "title": "Overall Assessment"
+    },
+    "evidence": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EvidenceChain"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Attribution payload so that every statement in this assessment can be traced back to the media it came from.",
+      "title": "Evidence"
+    }
+  },
+  "required": [
+    "asset_identification",
+    "capture_context",
+    "media_quality",
+    "anomalies",
+    "overall_assessment",
+    "evidence"
+  ],
+  "title": "TowerInspectionImageAssessment",
+  "type": "object"
+}

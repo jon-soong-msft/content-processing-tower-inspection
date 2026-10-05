@@ -1,0 +1,13 @@
+{
+    "schemas": [
+        {
+            "File": "towerinspectionimage.json",
+            "ClassName": "TowerInspectionImageAssessment",
+            "Description": "Tower Inspection Image Assessment"
+        }
+    ],
+    "schemaset": {
+        "Name": "Tower Inspection",
+        "Description": "Transmission tower inspection schema set — six-class anomaly detection with three-level severity scoring and an evidence chain"
+    }
+}
